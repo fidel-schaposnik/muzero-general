@@ -18,6 +18,7 @@ class MuZeroConfig:
         self.action_space = [i for i in range(7)]  # Fixed list of all possible actions. You should only edit the length
         self.players = [i for i in range(2)]  # List of players. You should only edit the length
         self.stacked_observations = 0  # Number of previous observation to add to the current observation
+        self.exploit_symmetries = [False, False, False]  # [Horizontal symmetry, Vertical symmetry, Diagonal symmetry]. Batch size must be divisible by the number symmetries + 1
 
 
         ### Self-Play

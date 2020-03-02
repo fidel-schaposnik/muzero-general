@@ -38,7 +38,7 @@ class Trainer:
 
         # Training loop
         while True:
-            batch = ray.get(replay_buffer.get_batch.remote())
+            batch = ray.get(replay_buffer.get_batch.remote(self.config.exploit_symmetries))
             total_loss, value_loss, reward_loss, policy_loss = self.update_weights(
                 batch
             )

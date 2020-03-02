@@ -18,12 +18,13 @@ class MuZeroConfig:
         self.action_space = [i for i in range(4)]  # Fixed list of all possible actions. You should only edit the length
         self.players = [i for i in range(1)]  # List of players. You should only edit the length
         self.stacked_observations = 0  # Number of previous observation to add to the current observation
+        self.exploit_symmetries = [False, False, False]  # [Horizontal symmetry, Vertical symmetry, Diagonal symmetry]. Batch size must be divisible by the number symmetries + 1
 
 
         ### Self-Play
         self.num_actors = 4  # Number of simultaneous threads self-playing to feed the replay buffer
         self.max_moves = 2000  # Maximum number of moves if game is not finished before
-        self.num_simulations = 100  # Number of futur moves self-simulated
+        self.num_simulations = 50  # Number of futur moves self-simulated
         self.discount = 0.997  # Chronological discount of the reward
         self.temperature_threshold = 2000  # Number of moves before dropping temperature to 0 (ie playing according to the max)
         self.self_play_delay = 0  # Number of seconds to wait after each played game to adjust the self play / training ratio to avoid over/underfitting
@@ -74,7 +75,7 @@ class MuZeroConfig:
         self.momentum = 0.9
 
         # Exponential learning rate schedule
-        self.lr_init = 0.005  # Initial learning rate
+        self.lr_init = 0.05  # Initial learning rate
         self.lr_decay_rate = 1  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 1000
 
@@ -120,7 +121,7 @@ class Game(AbstractGame):
             The new observation, the reward and a boolean if the game has ended.
         """
         observation, reward, done, _ = self.env.step(action)
-        return numpy.array([[observation]]), reward/5, done
+        return numpy.array([[observation]]), reward, done
 
     def to_play(self):
         """

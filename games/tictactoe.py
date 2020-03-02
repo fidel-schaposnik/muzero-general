@@ -18,6 +18,7 @@ class MuZeroConfig:
         self.action_space = [i for i in range(9)]  # Fixed list of all possible actions. You should only edit the length
         self.players = [i for i in range(2)]  # List of players. You should only edit the length
         self.stacked_observations = 0  # Number of previous observation to add to the current observation
+        self.exploit_symmetries = [True, True, True]  # [Horizontal symmetry, Vertical symmetry, Diagonal symmetry]. Batch size must be divisible by the number symmetries + 1
 
 
         ### Self-Play
@@ -62,7 +63,7 @@ class MuZeroConfig:
         ### Training
         self.results_path = os.path.join(os.path.dirname(__file__), "../results", os.path.basename(__file__)[:-3], datetime.datetime.now().strftime("%Y-%m-%d--%H-%M-%S"))  # Path to store the model weights and TensorBoard logs
         self.training_steps = 100000  # Total number of training steps (ie weights update according to a batch)
-        self.batch_size = 32  # Number of parts of games to train on at each training step
+        self.batch_size = 400  # Number of parts of games to train on at each training step
         self.num_unroll_steps = 10  # Number of game moves to keep for every batch element
         self.checkpoint_interval = 10  # Number of training steps before using the model for sef-playing
         self.window_size = 1000000  # Number of self-play games to keep in the replay buffer
