@@ -75,7 +75,7 @@ class MuZeroConfig:
         self.momentum = 0.9
 
         # Exponential learning rate schedule
-        self.lr_init = 0.005  # Initial learning rate
+        self.lr_init = 0.1  # Initial learning rate
         self.lr_decay_rate = 1  # Set it to 1 to use a constant learning rate
         self.lr_decay_steps = 10000
 
@@ -171,9 +171,9 @@ class Game(AbstractGame):
         Returns:
             An integer from the action space.
         """
-        choice = ("Enter the column to play for the player {}: ".format(self.to_play()))
+        choice = input("Enter the column to play for the player {}: ".format(self.to_play()))
         while choice not in [str(action) for action in self.legal_actions()]:
-            choice = ("Enter another column : ")
+            choice = input("Enter another column : ")
         return int(choice)
 
     def output_action(self, action_number):

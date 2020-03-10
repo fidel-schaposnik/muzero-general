@@ -54,26 +54,27 @@ class SelfPlay:
                 shared_storage.set_infos.remote(
                     "total_reward", sum(game_history.reward_history)
                 )
-                shared_storage.set_infos.remote(
-                    "player_0_reward",
-                    sum(
-                        [
-                            reward
-                            for i, reward in enumerate(game_history.reward_history)
-                            if game_history.to_play_history[i] == 0
-                        ]
-                    ),
-                )
-                shared_storage.set_infos.remote(
-                    "player_1_reward",
-                    sum(
-                        [
-                            reward
-                            for i, reward in enumerate(game_history.reward_history)
-                            if game_history.to_play_history[i] == 1
-                        ]
-                    ),
-                )
+                if 1 < len(self.config.players):
+                    shared_storage.set_infos.remote(
+                        "player_0_reward",
+                        sum(
+                            [
+                                reward
+                                for i, reward in enumerate(game_history.reward_history)
+                                if game_history.to_play_history[i] == 1
+                            ]
+                        ),
+                    )
+                    shared_storage.set_infos.remote(
+                        "player_1_reward",
+                        sum(
+                            [
+                                reward
+                                for i, reward in enumerate(game_history.reward_history)
+                                if game_history.to_play_history[i] == 0
+                            ]
+                        ),
+                    )
             if not test_mode:
                 replay_buffer.save_game.remote(game_history)
 
@@ -91,15 +92,21 @@ class SelfPlay:
         observation = self.stack_previous_observations(
             observation, game_history, self.config.stacked_observations
         )
+        game_history.action_history.append(0)
         game_history.observation_history.append(observation)
+
+        game_history.reward_history.append(0)
         game_history.to_play_history.append(self.game.to_play())
+
         done = False
 
         if render:
             self.game.render()
 
         with torch.no_grad():
-            while not done and len(game_history.action_history) < self.config.max_moves:
+            while (
+                not done and len(game_history.action_history) <= self.config.max_moves
+            ):
                 root = MCTS(self.config).run(
                     self.model,
                     observation,
@@ -141,11 +148,13 @@ class SelfPlay:
                     print("Played action: {}".format(self.game.output_action(action)))
                     self.game.render()
 
+                game_history.store_search_statistics(root, self.config.action_space)
+
+                # Next batch
+                game_history.action_history.append(action)
                 game_history.observation_history.append(observation)
                 game_history.reward_history.append(reward)
-                game_history.action_history.append(action)
                 game_history.to_play_history.append(self.game.to_play())
-                game_history.store_search_statistics(root, self.config.action_space)
 
         self.game.close()
         return game_history
@@ -157,15 +166,24 @@ class SelfPlay:
         stacked_observations = observation.copy()
         for i in range(num_stacked_observations):
             try:
-                previous_observation = game_history.observation_history[-i - 1][
-                    : observation.shape[0]
-                ]
+                previous_observation = numpy.concatenate(
+                    (
+                        game_history.observation_history[-i - 1][
+                            : observation.shape[0]
+                        ],
+                        [numpy.ones_like(observation[0])
+                        * game_history.action_history[-i - 1]],
+                    ), axis=0
+                )
             except IndexError:
-                previous_observation = numpy.zeros_like(observation)
+                previous_observation = numpy.concatenate(
+                    (numpy.zeros_like(observation), [numpy.zeros_like(observation[0])]), axis=0
+                )
 
             stacked_observations = numpy.concatenate(
                 (stacked_observations, previous_observation), axis=0
             )
+
         return stacked_observations
 
     @staticmethod
@@ -220,14 +238,10 @@ class MCTS:
             .unsqueeze(0)
             .to(next(model.parameters()).device)
         )
-        _, expected_reward, policy_logits, hidden_state = model.initial_inference(
-            observation
-        )
-        expected_reward = self.support_to_scalar(
-            expected_reward, self.config.support_size
-        )
+        _, reward, policy_logits, hidden_state = model.initial_inference(observation)
+        reward = self.support_to_scalar(reward, self.config.support_size)
         root.expand(
-            legal_actions, to_play, expected_reward, policy_logits, hidden_state,
+            legal_actions, to_play, reward, policy_logits, hidden_state,
         )
         if add_exploration_noise:
             root.add_exploration_noise(
@@ -244,7 +258,6 @@ class MCTS:
 
             while node.expanded():
                 action, node = self.select_child(node, min_max_stats)
-                last_action = action
                 search_path.append(node)
 
                 # Players play turn by turn
@@ -258,7 +271,7 @@ class MCTS:
             parent = search_path[-2]
             value, reward, policy_logits, hidden_state = model.recurrent_inference(
                 parent.hidden_state,
-                torch.tensor([last_action]).unsqueeze(1).to(parent.hidden_state.device),
+                torch.tensor([[action]]).to(parent.hidden_state.device),
             )
             value = self.support_to_scalar(value, self.config.support_size)
             reward = self.support_to_scalar(reward, self.config.support_size)
@@ -270,7 +283,9 @@ class MCTS:
                 hidden_state,
             )
 
-            self.backpropagate(search_path, value.item(), to_play, min_max_stats)
+            self.backpropagate(
+                search_path, value.item(), virtual_to_play, min_max_stats
+            )
 
         return root
 
@@ -324,6 +339,7 @@ class MCTS:
         support = (
             torch.tensor([x for x in range(-support_size, support_size + 1)])
             .expand(probs.shape)
+            .float()
             .to(device=probs.device)
         )
         x = torch.sum(support * probs, dim=1, keepdim=True)
@@ -394,6 +410,7 @@ class GameHistory:
         self.root_values = []
 
     def store_search_statistics(self, root, action_space):
+        # Turn visit count from root into a policy
         sum_visits = sum(child.visit_count for child in root.children.values())
         self.child_visits.append(
             [
@@ -401,6 +418,7 @@ class GameHistory:
                 for a in action_space
             ]
         )
+
         self.root_values.append(root.value())
 
 

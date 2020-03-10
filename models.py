@@ -64,7 +64,8 @@ class MuZeroFullyConnectedNetwork(torch.nn.Module):
             observation_shape[0]
             * observation_shape[1]
             * observation_shape[2]
-            * (stacked_observations + 1),
+            * (stacked_observations + 1) + stacked_observations  * observation_shape[1]
+            * observation_shape[2],
             fc_representation_layers,
             encoding_size,
         )
@@ -122,7 +123,7 @@ class MuZeroFullyConnectedNetwork(torch.nn.Module):
         scale_next_encoded_state = max_next_encoded_state - min_next_encoded_state
         scale_next_encoded_state[scale_next_encoded_state == 0] = 1
         next_encoded_state_normalized = (
-            encoded_state - min_next_encoded_state
+            next_encoded_state - min_next_encoded_state
         ) / scale_next_encoded_state
 
         reward = self.dynamics_reward_network(x)
@@ -193,7 +194,7 @@ class RepresentationNetwork(torch.nn.Module):
     ):
         super(RepresentationNetwork, self).__init__()
         self.conv = conv3x3(
-            observation_shape[0] * (stacked_observations + 1), num_channels
+            observation_shape[0] * (stacked_observations + 1) + stacked_observations, num_channels
         )
         self.bn = torch.nn.BatchNorm2d(num_channels)
         self.relu = torch.nn.ReLU()
