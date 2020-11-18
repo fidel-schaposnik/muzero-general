@@ -4,7 +4,5 @@ tensorboard
 gym
 box2d-py
 ray
-psutil
-setproctitle
-aiohttp
-grpcio
+seaborn
+nevergrad
